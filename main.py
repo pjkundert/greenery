@@ -4,8 +4,11 @@
 
 from __future__ import print_function
 
-import sys
-from lego import parse
+# Allow import of package from executable within its directory
+import sys, os
+sys.path.insert( 0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import greenery
 
 regexes = []
 verbose = 0
@@ -68,37 +71,42 @@ if errors:
 	exit(1)
 
 def build( regexes ):
+	# Builds a dictionary of "Label": (lego,fsm) for Concatenation,
+	# Intersection and Union, including all supplied regular expressions.
 	d = dict()
 
-	i = parse(regexes[0])
+	i = greenery.parse(regexes[0])
 	for regex in regexes[1:]:
-		i &= parse(regex)
+		i &= greenery.parse(regex)
 	d["Intersection"] = (i,i.fsm())
 
-	u = parse(regexes[0])
+	u = greenery.parse(regexes[0])
 	for regex in regexes[1:]:
-		u |= parse(regex)
+		u |= greenery.parse(regex)
 	ufsm = d["Union"] = (u,u.fsm())
 	
-	c = parse(regexes[0])
+	c = greenery.parse(regexes[0])
 	for regex in regexes[1:]:
-		c += parse(regex)
+		c += greenery.parse(regex)
 	cfsm = d["Concatenation"] = (c,c.fsm())
 
 	return d
 
 if timing:
+	# Compute the cost to parse the regular expression (lego), and build the
+	# finite state machine (fsm) for all the compositions of the given
+	# regular expressions.
 	import timeit
 	t = timeit.Timer('build(regexes)',setup='from __main__ import build, regexes')
-	rep, num = 3, 5
-	print("%.3f ms/loop avg" % (1000*min(t.repeat(rep,num))/num))
+	rep, num = 3, 10
+	print("%.3f ms/build avg" % ( 1000*min(t.repeat(rep,num))/num ))
 
 d = build(regexes)
 for k,rm in d.items():
 	r,m = rm
-	print( "%-20s: %s" % ( k, r ))
+	print( "%-20s: %s" % ( k, r ))  # Regular Expression notation
 	if verbose:
-		print( str( m ))
+		print( str( m ))        # FSM transition table
 
 def input_lines( prompt="--> "):
 	line = input(prompt)
@@ -106,6 +114,7 @@ def input_lines( prompt="--> "):
 		yield line
 		line = input(prompt)
 
+# If -i or -- "test" ... supplied, display how each composite FSM accepts each test
 if interactive or tests:
 	for line in tests if tests else input_lines():
 		print("Testing w/: %r" % line )
@@ -116,4 +125,3 @@ if interactive or tests:
 			except Exception as e:
 				result = repr( e )
 			print("%-20s: %-20s: %s" % ( k, r, result))
-	
